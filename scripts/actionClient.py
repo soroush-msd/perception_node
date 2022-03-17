@@ -52,10 +52,13 @@ if __name__ == '__main__':
         # Initializes a rospy node so that the SimpleActionClient can
         # publish and subscribe over ROS.
         rospy.init_node('darknet_client_py')
+        init = darknet_client()
         result = darknet_client()
         #rospy.loginfo(result.id)
+        for i in range(len(result.bounding_boxes.bounding_boxes)):
+            print(result.bounding_boxes.bounding_boxes[i].Class)
         #rospy.loginfo(result.bounding_boxes.bounding_boxes[0].Class)
-        rospy.loginfo(result)
+        #rospy.loginfo(result)
         
     except rospy.ROSInterruptException:
         print("program interrupted before completion", file=sys.stderr)

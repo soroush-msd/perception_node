@@ -19,25 +19,31 @@ class Human(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                             outcomes=['robot_turn', 'exit_success'],
-                            input_keys=['human_letter'],
+                            input_keys=['human_letter', 'robot_guesses'],
                             output_keys=['human_letter'])
 
     def execute(self, userdata):
         rospy.loginfo('Executing state HUMAN')
-        turn = raw_input("Welcome to ISpy! type either (H)uman or (R)obot to continue: ")
 
-        if turn == "h" or turn == "H":
-            print("you chose Human")
-            userdata.human_letter = raw_input("type the first letter of the object: ")
-            print("you selected: " + userdata.human_letter)
-            return 'robot_turn'
+        if(len(userdata.robot_guesses) == 0):
+            turn = raw_input("Welcome to ISpy! type either (H)uman or (R)obot to continue: ")
 
-        elif turn == "r" or turn == "R": 
-            print("you chose Robot")
+            if turn == "h" or turn == "H":
+                print("you chose Human")
+                userdata.human_letter = raw_input("type the first letter of the object: ")
+                print("you selected: " + userdata.human_letter)
+                return 'robot_turn'
 
-        # loop until correct usage instead of crashing the program
+            elif turn == "r" or turn == "R": 
+                print("you chose Robot")
+
+            # loop until correct usage instead of crashing the program
+            else:
+                sys.exit("usage: H/h || R/r")
+
         else:
-            sys.exit("usage: H/h || R/r")
+            for i in range(len(userdata.robot_guesses)):
+                print("The object that starts with " + userdata.human_letter+ " is " + userdata.robot_guesses[i])
 
         return 'exit_success'
 
@@ -47,7 +53,7 @@ class Robot(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                             outcomes=['perception', 'robot_responds_human'],
-                            input_keys=['human_letter_to_robot', 'object_names'])
+                            input_keys=['human_letter_to_robot', 'object_names', 'finalGuesses'])
 
     def execute(self, userdata):
 
@@ -60,9 +66,13 @@ class Robot(smach.State):
         else:
             print("Objects detected are:")
             for i in range(len(userdata.object_names)):
-                print(userdata.object_names[i])
+                if(userdata.object_names[i][0] == userdata.human_letter_to_robot):
+                    userdata.finalGuesses.append( userdata.object_names[i])
+                #print(userdata.object_names[i])
+            return 'robot_responds_human'
+
         
-        return 'robot_responds_human'
+        #return 'robot_responds_human'
         
         
         
@@ -117,7 +127,8 @@ def main():
     # Create a SMACH state machine
     sm = smach.StateMachine(outcomes=['failed', 'successfull'])
     sm.userdata.sm_letter = ""
-    sm.userdata.guess = []
+    sm.userdata.guess_list = []
+    sm.userdata.final_guess = []
     #sm.userdata.bridge = CvBridge()
 
     # Open the container
@@ -126,18 +137,20 @@ def main():
         smach.StateMachine.add('HUMAN', Human(), 
                                transitions={'robot_turn' : 'ROBOT' ,
                                             'exit_success' : 'successfull'},
-                               remapping={'human_letter' : 'sm_letter'})
+                               remapping={'human_letter' : 'sm_letter',
+                               "robot_guesses" : "final_guess"})
 
         smach.StateMachine.add('ROBOT', Robot(), 
                                transitions={'perception' : 'PERCEPTION',
-                               "robot_responds_human" : "failed"},
+                               "robot_responds_human" : "HUMAN"},
                                remapping={"human_letter_to_robot" : "sm_letter",
-                               "object_names" : "guess"})
+                               "object_names" : "guess_list",
+                               "finalGuesses" : "final_guess"})
 
         smach.StateMachine.add('PERCEPTION', Perception(), 
                                transitions={'objects' : 'ROBOT'},
                                remapping={"human_letter_to_robot" : "sm_letter",
-                               "objects_detected" : "guess",})
+                               "objects_detected" : "guess_list",})
 
     # Execute SMACH plan
     outcome = sm.execute()
